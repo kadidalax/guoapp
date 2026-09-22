@@ -22,13 +22,15 @@
 
 ## 任务收尾同步
 
-每次完成开发、修复或文档修改后，在必要检查通过、最终回复之前，必须执行 `python3 scripts/finish_task.py --message "本次实际完成的变更"`。脚本将干净源码同步到本项目同级的 `../guoapp`，创建本地 Git 提交和带说明的 tag，作为可恢复的版本。有后续修改时重新执行收尾，并用 `python3 scripts/sync_source.py --check` 确认一致；失败先处理原因，不要声称已完成。
+每次完成开发、修复或文档修改后，在必要检查通过、最终回复之前，必须执行 `python3 scripts/finish_task.py --destination . --message "本次实际完成的变更"`，脚本原地创建本地 Git 提交和带说明的 tag，作为可恢复的版本；Windows 本机 `python3` 是微软商店占位符，改用 `python`。需要另一份镜像时才指定别的目标，并用 `python3 scripts/sync_source.py --destination <目录> --check` 确认一致；失败先处理原因，不要声称已完成。
 
-`guoapp` 是面向 GitHub 的源码镜像。保留目标已有的 `.git` 和历史；其余文件与导出源码保持一致，包含源码、必要资源、构建配置、锁文件、测试和 Actions，排除 SDK、第三方依赖目录、缓存、编译产物、签名文件和个人配置。新增源码根目录或构建输入时同步维护脚本的收录规则。用户已授权每次实施结束后本地提交并打 tag，不再重复询问；不要自动推送 Git。
+本项目本身即是 GitHub 发布仓库 `https://github.com/kadidalax/guoapp`，不再维护同级 `../guoapp` 镜像。对外只保留源码、必要资源、构建配置、锁文件、测试和 Actions，排除 SDK、第三方依赖目录、缓存、编译产物、签名文件和个人配置。新增源码根目录或构建输入时同步维护 `scripts/sync_source.py` 的收录规则。用户已授权每次实施结束后本地提交并打 tag，不再重复询问；推送 GitHub 由用户决定，不要自动推送。
 
 功能版本递增 `pubspec.yaml` 的版本号和构建号。tag 默认使用 `v<版本号>`，同版本的后续修复使用脚本生成的时间后缀，不覆盖或移动已有 tag。最终回复说明本轮 tag；未通过检查的代码不得标为已完成版本。
 
-如果正在 `guoapp` 本身工作，不向自身同步；脚本会跳过此情况。不要为了同步另建临时源码副本。
+## 构建与发布
+
+`.github/workflows/build.yml` 在推送 `main` / `master` 或手动运行时构建红果鉴 / 真果鉴的 Android、Windows、iOS 产物，不跑测试；`v*` 标签推送不触发构建。Android 签名走仓库 Secrets，未配置时产出预览签名 APK；手动运行填写 tag 时全部构建结束后自动创建 Release。首次 Actions 运行结果确认前，不得声称任一平台可构建或可安装。
 
 ## 代码与资料
 

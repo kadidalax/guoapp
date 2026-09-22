@@ -4,6 +4,8 @@ Flutter 多端独立短剧应用，原名“短剧库 APP”。站源请求、�
 
 按用户 2026-09-21 的要求，暂停测试与回归。0.2.16 接入黄剧分类、分页在线搜索、详情与带签名 Cookie 的媒体请求，榜单图标移到顶部标题栏“排序与筛选”后面。本轮仅实施、整理源码格式和收尾同步，未运行静态分析、构建、自动化、设备或真实站源验证。0.2.15 两版 Android 构建与安装包检查记录保留。
 
+源码已发布到 GitHub 仓库 `https://github.com/kadidalax/guoapp`。`.github/workflows/build.yml` 改为推送 `main` / `master` 或手动运行 **Build app packages** 时构建，不跑测试；`v*` 标签推送不触发构建，手动运行可填写 tag 让构建完成后自动创建 Release。Actions 首次运行结果尚未确认。
+
 | 编译方式 | 应用名称 | 可用站源 |
 | --- | --- | --- |
 | 默认，不加参数 | 红果鉴 | 仅红果 |
@@ -572,17 +574,17 @@ Android 使用可用的 Thermal API、供电与省电状态辅助决策；`getTh
 
 ### GitHub Actions
 
-将 `guoapp` 源码发布到仓库根目录，保留 `.github`、锁文件、`native` 和平台工程；不用上传 SDK、依赖目录、SO、DLL 或缓存。
+本项目本身即是 GitHub 仓库：`https://github.com/kadidalax/guoapp`。仓库根目录只保留源码、平台工程、`.github`、锁文件和必要资源；SDK、依赖目录、SO / DLL、APK / EXE、签名文件、构建缓存和个人配置都不上传。
 
-推送 `main` / `master`、`v*` 标签、提交 PR，或手动运行 **Build app packages**，会先检查再构建：
+推送 `main` / `master`，或手动运行 **Build app packages**，只构建不跑测试：
 
 | 红果版 Artifact | 全站源版 Artifact | 内容 |
 | --- | --- | --- |
 | `hongguojian-android` | `zhenguojian-android` | 三种架构 APK 和 SHA256 |
-| `hongguojian-windows` | `zhenguojian-windows` | 完整 ZIP 和 SHA256；从解压包检查原生核心、FFprobe、换封装及播放器启动 |
+| `hongguojian-windows` | `zhenguojian-windows` | 完整 ZIP 和 SHA256 |
 | `hongguojian-ios-unsigned` | `zhenguojian-ios-unsigned` | 未签名 `.app` ZIP 和 SHA256，不能直接当已签名 IPA 安装 |
 
-Actions 分别传入默认参数与 `--all-sources` 构建两版，Flutter 和 Go 回归也覆盖两种编译配置。产物保留 14 天，不自动创建 GitHub Release。首次平台构建结果以实际 Actions 输出为准。
+Actions 分别传入默认参数与 `--all-sources` 构建红果鉴 / 真果鉴两版，真果鉴包含全部站源。产物保留 14 天；`v*` 标签推送不触发构建。手动运行 **Build app packages** 时可在 `release_tag` 填入 tag（例如 `v0.2.17`），全部构建结束后自动创建同名 GitHub Release 并挂上产物，便于直接下载；Artifacts 需要登录 GitHub 才能下载，Release 不需要。Actions 目前尚未运行过，首次平台构建结果以实际 Actions 输出为准。
 
 Android 正式发布持续使用同一签名并递增构建号，在仓库 Secrets 配置：
 
@@ -704,22 +706,20 @@ flutter drive --driver=test_driver/playback.dart --target=integration_test/playb
 每次完成任务并通过必要检查后执行：
 
 ~~~sh
-python3 scripts/finish_task.py --message "本次实际完成的变更"
-python3 scripts/sync_source.py --check
+python3 scripts/finish_task.py --destination . --message "本次实际完成的变更"
 ~~~
 
-尚未完成集中验证和平台验收时，使用带 `unverified` 的开发快照 tag。本轮黄剧站源与榜单位置调整的源码快照为 `v0.2.16-unverified`，表示源码可恢复，不标为完成验收的正式版本。首页布局与 Android 打包快照 `v0.2.15-unverified`、启动修复快照 `v0.2.14-unverified`、局域网同步与推送快照 `v0.2.13-unverified`、界面与媒体流程快照 `v0.2.12-unverified`、红果弹幕快照 `v0.2.11-unverified`、0.2.10 功能快照 `v0.2.10-unverified` 与打包修复 `v0.2.10-unverified-task-20260921-055042` 保留。源码同步一致性确认仍执行。
+尚未完成集中验证和平台验收时，使用带 `unverified` 的开发快照 tag。本轮黄剧站源与榜单位置调整的源码快照为 `v0.2.16-unverified`，GitHub 发布仓库与多平台 Actions 构建的快照为 `v0.2.16-unverified-github-actions`（只改构建发布配置和文档，未运行 Actions），表示源码可恢复，不标为完成验收的正式版本。首页布局与 Android 打包快照 `v0.2.15-unverified`、启动修复快照 `v0.2.14-unverified`、局域网同步与推送快照 `v0.2.13-unverified`、界面与媒体流程快照 `v0.2.12-unverified`、红果弹幕快照 `v0.2.11-unverified`、0.2.10 功能快照 `v0.2.10-unverified` 与打包修复 `v0.2.10-unverified-task-20260921-055042` 保留。源码同步一致性确认仍执行。
 
 局域网自动连接、记录自动同步与推送播放的早期方案文档快照 `v0.2.12-unverified-lan-design` 保留；该历史快照仅有设计，0.2.13 才接入实现。
 
-脚本同步纯源码到同级 `../guoapp`，保留 `.git` 历史，创建本地提交和带说明的 tag；默认 `v<版本号>`，同版本后续修复加时间后缀，不覆盖旧标签，不自动推送 GitHub。
+本项目已直接作为 GitHub 发布仓库，收尾即在原地创建提交和 tag，不再维护同级 `../guoapp` 镜像；要另建镜像时用 `python3 scripts/sync_source.py --destination <目录>`。脚本创建本地提交和带说明的 tag，默认 `v<版本号>`，同版本后续修复加时间后缀，不覆盖旧标签，也不自动推送。
 
-只同步用 `python3 scripts/sync_source.py`；在 `guoapp` 内工作时跳过向自身同步。保留必要源码、资源、锁文件、测试、平台工程和 Actions，排除依赖、SDK、缓存、产物、签名及个人配置。
+只收录必要源码、资源、锁文件、测试、平台工程和 Actions，排除依赖、SDK、缓存、产物、签名及个人配置；在发布仓库内 `python3 scripts/sync_source.py --check` 会提示跳过向自身同步，属正常结果。
 
 恢复示例：
 
 ~~~sh
-cd ../guoapp
 git switch -c restore-v0.2.3 v0.2.3
 ~~~
 
