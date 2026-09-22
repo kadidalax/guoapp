@@ -51,7 +51,14 @@ jobs:
           flutter-version: '3.47.4'
           channel: stable
           cache: true
-      - run: sdkmanager 'ndk;28.2.13676358'
+      - name: Select Android NDK
+        run: |
+          ndk="$ANDROID_HOME/ndk/28.2.13676358"
+          if [ ! -d "$ndk" ]; then
+            echo "runner 缺少 NDK 28.2.13676358：$ndk" >&2
+            exit 1
+          fi
+          echo "ANDROID_NDK_HOME=$ndk" >> "$GITHUB_ENV"
       - name: Configure Android signing
         run: python scripts/configure_signing.py
         env:
@@ -95,9 +102,28 @@ jobs:
           flutter-version: '3.47.4'
           channel: stable
           cache: true
-      - uses: egor-tensin/setup-mingw@v2
-        with:
-          platform: x64
+      - name: Prepare MinGW-w64
+        shell: pwsh
+        run: |
+          $gcc = Get-Command x86_64-w64-mingw32-gcc -ErrorAction SilentlyContinue
+          if (-not $gcc) { $gcc = Get-Command gcc -ErrorAction SilentlyContinue }
+          if (-not $gcc) {
+            $candidates = @(
+              'C:\mingw64\bin\x86_64-w64-mingw32-gcc.exe',
+              'C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\x86_64-w64-mingw32-gcc.exe',
+              'C:\msys64\mingw64\bin\x86_64-w64-mingw32-gcc.exe'
+            )
+            foreach ($candidate in $candidates) {
+              if (Test-Path $candidate) {
+                Split-Path $candidate | Out-File -FilePath $env:GITHUB_PATH -Append
+                $gcc = Get-Item $candidate
+                break
+              }
+            }
+          }
+          if (-not $gcc) { throw '未找到 MinGW-w64 的 gcc，无法编译 Windows 原生核心。' }
+          Write-Host "使用 $($gcc.Source)"
+          & $gcc.Source --version | Select-Object -First 1
       - run: python scripts/build_windows.py ${{ matrix.arguments }}
       - uses: actions/upload-artifact@v4
         with:

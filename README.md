@@ -584,7 +584,11 @@ Android 使用可用的 Thermal API、供电与省电状态辅助决策；`getTh
 | `hongguojian-windows` | `zhenguojian-windows` | 完整 ZIP 和 SHA256 |
 | `hongguojian-ios-unsigned` | `zhenguojian-ios-unsigned` | 未签名 `.app` ZIP 和 SHA256，不能直接当已签名 IPA 安装 |
 
-Actions 分别传入默认参数与 `--all-sources` 构建红果鉴 / 真果鉴两版，真果鉴包含全部站源。产物保留 14 天；`v*` 标签推送不触发构建。手动运行 **Build app packages** 时可在 `release_tag` 填入 tag（例如 `v0.2.17`），全部构建结束后自动创建同名 GitHub Release 并挂上产物，便于直接下载；Artifacts 需要登录 GitHub 才能下载，Release 不需要。Actions 目前尚未运行过，首次平台构建结果以实际 Actions 输出为准。
+Actions 分别传入默认参数与 `--all-sources` 构建红果鉴 / 真果鉴两版，真果鉴包含全部站源。产物保留 14 天；`v*` 标签推送不触发构建。手动运行 **Build app packages** 时可在 `release_tag` 填入 tag（例如 `v0.2.17`），全部构建结束后自动创建同名 GitHub Release 并挂上产物，便于直接下载；Artifacts 需要登录 GitHub 才能下载，Release 不需要。
+
+不使用 `sdkmanager` 安装 NDK，也不再使用第三方 `setup-mingw` 动作：Android 直接用 runner 镜像自带的 NDK `28.2.13676358`（并写入 `ANDROID_NDK_HOME`），Windows 使用镜像自带的 MinGW-w64 gcc，只做可用性检查并按需补 PATH。
+
+首次运行结果（2026-09-22）：iOS 红果鉴 / 真果鉴两版构建成功；Android 两版在 `sdkmanager` 步骤失败（runner 上该命令不在 PATH，退出码 127），Windows 两版在 `egor-tensin/setup-mingw@v2` 步骤失败（与 mingw 16.1.0 的 `libpthread.dll.a` 冲突）。两处已按上一段改写，Android / Windows 构建结果待下一次运行确认，未验证前不代表这两端的安装包可用。
 
 Android 正式发布持续使用同一签名并递增构建号，在仓库 Secrets 配置：
 
