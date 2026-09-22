@@ -4,7 +4,7 @@ Flutter 多端独立短剧应用，原名“短剧库 APP”。站源请求、�
 
 按用户 2026-09-21 的要求，暂停测试与回归。0.2.16 接入黄剧分类、分页在线搜索、详情与带签名 Cookie 的媒体请求，榜单图标移到顶部标题栏“排序与筛选”后面。本轮仅实施、整理源码格式和收尾同步，未运行静态分析、构建、自动化、设备或真实站源验证。0.2.15 两版 Android 构建与安装包检查记录保留。
 
-源码已发布到 GitHub 仓库 `https://github.com/kadidalax/guoapp`。`.github/workflows/build.yml` 改为推送 `main` / `master` 或手动运行 **Build app packages** 时构建，不跑测试；`v*` 标签推送不触发构建，手动运行可填写 tag 让构建完成后自动创建 Release。Actions 首次运行结果尚未确认。
+源码已发布到 GitHub 仓库 `https://github.com/kadidalax/guoapp`。`.github/workflows/build.yml` 改为推送 `main` / `master` 或手动运行 **Build app packages** 时构建，不跑测试；`v*` 标签推送不触发构建，手动运行可填写 tag 让构建完成后自动创建 Release。首次运行结果：Android 与 iOS 的红果鉴 / 真果鉴两版构建成功，Windows 仍待确认。
 
 | 编译方式 | 应用名称 | 可用站源 |
 | --- | --- | --- |
@@ -588,7 +588,7 @@ Actions 分别传入默认参数与 `--all-sources` 构建红果鉴 / 真果鉴�
 
 不使用 `sdkmanager` 安装 NDK，也不再使用第三方 `setup-mingw` 动作：Android 直接用 runner 镜像自带的 NDK `28.2.13676358`（并写入 `ANDROID_NDK_HOME`），Windows 使用镜像自带的 MinGW-w64 gcc，只做可用性检查并按需补 PATH。
 
-首次运行结果（2026-09-22）：iOS 红果鉴 / 真果鉴两版构建成功；Android 两版在 `sdkmanager` 步骤失败（runner 上该命令不在 PATH，退出码 127），Windows 两版在 `egor-tensin/setup-mingw@v2` 步骤失败（与 mingw 16.1.0 的 `libpthread.dll.a` 冲突）。两处已按上一段改写，Android / Windows 构建结果待下一次运行确认，未验证前不代表这两端的安装包可用。
+首次运行结果（2026-09-22）：iOS 与 Android 的红果鉴 / 真果鉴两版构建成功。Android 曾因 runner 上 `sdkmanager` 不在 PATH 失败（退出码 127），Windows 曾因 `egor-tensin/setup-mingw@v2` 与 mingw 16.1.0 的 `libpthread.dll.a` 冲突失败，两处已按上一段改写。Windows 随后在 CMake `INSTALL` 步骤失败，报错 `file cannot create directory: ...build/windows/x64/$<TARGET_FILE_DIR:zhenguojian>/..`：`windows/CMakeLists.txt` 的 `CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION` 用了相对路径 `"."`，与含生成表达式的 `CMAKE_INSTALL_PREFIX` 冲突，已改为 `${INSTALL_BUNDLE_LIB_DIR}`；Windows 构建结果待下一次运行确认，未确认前不代表该平台安装包可用。失败的 Windows 任务会附加运行“Diagnose Windows bundle”步骤，输出打包目录、插件解压目录和手动执行 `install` 的真实报错。
 
 Android 正式发布持续使用同一签名并递增构建号，在仓库 Secrets 配置：
 
