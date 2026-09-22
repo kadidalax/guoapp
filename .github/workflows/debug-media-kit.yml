@@ -8,15 +8,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
-      - name: Report tools
-        shell: pwsh
-        run: |
-          Get-Command cmake -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
-          cmake --version
-          $sevenZip = Get-Command 7z, 7za, 7zr -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
-          Write-Host "7zip=$sevenZip"
-          Test-Path 'C:\Program Files\7-Zip\7z.exe'
-      - name: Extract with cmake
+      - name: Compare extractors
         shell: pwsh
         run: |
           $work = Join-Path $env:RUNNER_TEMP 'mk'
@@ -28,13 +20,23 @@ jobs:
           foreach ($archive in $archives) {
             $file = Join-Path $work $archive.Name
             curl.exe -sL -o $file $archive.Url
-            $out = Join-Path $work ('out-' + $archive.Name)
-            New-Item -ItemType Directory -Force $out | Out-Null
             Write-Host "=== $($archive.Name) 大小 $((Get-Item $file).Length) ==="
-            Push-Location $out
-            & cmake -E tar xzf $file
-            Write-Host "cmake -E tar xzf 退出码=$LASTEXITCODE"
+            Write-Host '--- cmake -E tar tf 列表 ---'
+            & cmake -E tar tf $file
+            $tarDir = Join-Path $work ('tar-' + $archive.Name)
+            New-Item -ItemType Directory -Force $tarDir | Out-Null
+            Push-Location $tarDir
+            & cmake -E tar xzf $file 2>&1 | Out-Null
             Pop-Location
-            $items = Get-ChildItem -Recurse $out | Select-Object -First 15 -ExpandProperty FullName
-            if (-not $items) { Write-Host '解压结果：空' } else { $items | ForEach-Object { Write-Host $_ } }
+            $tarFiles = Get-ChildItem -Recurse -File $tarDir
+            Write-Host "--- cmake 解压出 $($tarFiles.Count) 个文件 ---"
+            $tarFiles | ForEach-Object { Write-Host ('  ' + $_.FullName.Substring($tarDir.Length + 1)) }
+            $zipDir = Join-Path $work ('7z-' + $archive.Name)
+            New-Item -ItemType Directory -Force $zipDir | Out-Null
+            Push-Location $zipDir
+            7z x -y $file | Out-Null
+            Pop-Location
+            $zipFiles = Get-ChildItem -Recurse -File $zipDir
+            Write-Host "--- 7z 解压出 $($zipFiles.Count) 个文件 ---"
+            $zipFiles | ForEach-Object { Write-Host ('  ' + $_.FullName.Substring($zipDir.Length + 1)) }
           }
