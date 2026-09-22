@@ -218,6 +218,7 @@ jobs:
           fi
           printf '%s\n' "${files[@]}"
           gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
             --title "$RELEASE_TAG" \
             --notes "真果鉴（全站源）与红果鉴的 Android APK、Windows 完整 ZIP、iOS 未签名包，由 Build app packages 工作流生成，未经过设备验证。" \
             "${files[@]}"
