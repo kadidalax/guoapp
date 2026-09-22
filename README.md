@@ -586,6 +586,8 @@ Android 使用可用的 Thermal API、供电与省电状态辅助决策；`getTh
 
 Actions 分别传入默认参数与 `--all-sources` 构建红果鉴 / 真果鉴两版，真果鉴包含全部站源。产物保留 14 天；`v*` 标签推送不触发构建。手动运行 **Build app packages** 时可在 `release_tag` 填入 tag（例如 `v0.2.17`），全部构建结束后自动创建同名 GitHub Release 并挂上产物，便于直接下载；Artifacts 需要登录 GitHub 才能下载，Release 不需要。
 
+已发布 Release `v0.2.16-unverified-utf8-io`，内容为提交 `47242fa` 的构建产物：两版 Android 各三个架构 APK（约 29.4 / 37.5 / 31 MB）、两版 Windows 完整 ZIP（各 56.8 MB）、两版 iOS 未签名 ZIP（各 28.5 MB），另附各平台 `SHA256SUMS.txt`。自动创建 Release 的步骤修过两处（同名 `SHA256SUMS.txt` 冲突、未 checkout 时缺少 `--repo` 仓库上下文），最后一次修改（提交 `d94ff32`）尚未在 Actions 中运行验证；上面的 Release 是用已验证运行 `35734155185` 的产物手工发布的。
+
 不使用 `sdkmanager` 安装 NDK，也不再使用第三方 `setup-mingw` 动作：Android 直接用 runner 镜像自带的 NDK `28.2.13676358`（并写入 `ANDROID_NDK_HOME`），Windows 使用镜像自带的 MinGW-w64 gcc，只做可用性检查并按需补 PATH。
 
 首次运行结果（2026-09-22）：iOS 与 Android 的红果鉴 / 真果鉴两版构建成功。Android 曾因 runner 上 `sdkmanager` 不在 PATH 失败（退出码 127），Windows 曾因 `egor-tensin/setup-mingw@v2` 与 mingw 16.1.0 的 `libpthread.dll.a` 冲突失败，两处已按上一段改写。Windows 随后在 CMake `INSTALL` 步骤失败，报错 `file cannot create directory: ...build/windows/x64/$<TARGET_FILE_DIR:zhenguojian>/..`：`windows/CMakeLists.txt` 的 `CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION` 用了相对路径 `"."`，与含生成表达式的 `CMAKE_INSTALL_PREFIX` 冲突，已改为 `${INSTALL_BUNDLE_LIB_DIR}`，Windows 编译通过。之后 `package_release.py` 读取 `pubspec.yaml` 未指定编码，在 Windows 上按 cp1252 解码中文描述报 `UnicodeDecodeError`，已为 `package_release.py`、`build_ios.py`、`smoke_windows.py`、`generate_brand_assets.py` 的文本读写补上 `encoding='utf-8'`。提交 `47242fa` 的一轮六个任务全部成功，产物为 Android 每份 97.2 MB、Windows 每份 56.6 MB、iOS 每份 28.3 MB。失败时会附加运行“Diagnose Windows bundle”步骤，输出打包目录、插件解压目录和手动执行 `install` 的真实报错。这些结论只说明构建成功，未在真实设备上运行验证，不代表安装包已验收。
