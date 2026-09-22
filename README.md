@@ -588,7 +588,7 @@ Actions 分别传入默认参数与 `--all-sources` 构建红果鉴 / 真果鉴�
 
 不使用 `sdkmanager` 安装 NDK，也不再使用第三方 `setup-mingw` 动作：Android 直接用 runner 镜像自带的 NDK `28.2.13676358`（并写入 `ANDROID_NDK_HOME`），Windows 使用镜像自带的 MinGW-w64 gcc，只做可用性检查并按需补 PATH。
 
-首次运行结果（2026-09-22）：iOS 与 Android 的红果鉴 / 真果鉴两版构建成功。Android 曾因 runner 上 `sdkmanager` 不在 PATH 失败（退出码 127），Windows 曾因 `egor-tensin/setup-mingw@v2` 与 mingw 16.1.0 的 `libpthread.dll.a` 冲突失败，两处已按上一段改写。Windows 随后在 CMake `INSTALL` 步骤失败，报错 `file cannot create directory: ...build/windows/x64/$<TARGET_FILE_DIR:zhenguojian>/..`：`windows/CMakeLists.txt` 的 `CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION` 用了相对路径 `"."`，与含生成表达式的 `CMAKE_INSTALL_PREFIX` 冲突，已改为 `${INSTALL_BUNDLE_LIB_DIR}`；Windows 构建结果待下一次运行确认，未确认前不代表该平台安装包可用。失败的 Windows 任务会附加运行“Diagnose Windows bundle”步骤，输出打包目录、插件解压目录和手动执行 `install` 的真实报错。
+首次运行结果（2026-09-22）：iOS 与 Android 的红果鉴 / 真果鉴两版构建成功。Android 曾因 runner 上 `sdkmanager` 不在 PATH 失败（退出码 127），Windows 曾因 `egor-tensin/setup-mingw@v2` 与 mingw 16.1.0 的 `libpthread.dll.a` 冲突失败，两处已按上一段改写。Windows 随后在 CMake `INSTALL` 步骤失败，报错 `file cannot create directory: ...build/windows/x64/$<TARGET_FILE_DIR:zhenguojian>/..`：`windows/CMakeLists.txt` 的 `CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION` 用了相对路径 `"."`，与含生成表达式的 `CMAKE_INSTALL_PREFIX` 冲突，已改为 `${INSTALL_BUNDLE_LIB_DIR}`，Windows 编译通过。之后 `package_release.py` 读取 `pubspec.yaml` 未指定编码，在 Windows 上按 cp1252 解码中文描述报 `UnicodeDecodeError`，已为 `package_release.py`、`build_ios.py`、`smoke_windows.py`、`generate_brand_assets.py` 的文本读写补上 `encoding='utf-8'`。Windows 打包结果待下一次运行确认，未确认前不代表该平台安装包可用。失败的 Windows 任务会附加运行“Diagnose Windows bundle”步骤，输出打包目录、插件解压目录和手动执行 `install` 的真实报错。
 
 Android 正式发布持续使用同一签名并递增构建号，在仓库 Secrets 配置：
 

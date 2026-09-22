@@ -20,7 +20,7 @@ def save(image, name):
     destination.parent.mkdir(parents=True, exist_ok=True)
     image.save(destination)
 
-contents = json.loads((root / 'ios/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json').read_text())
+contents = json.loads((root / 'ios/Runner/Assets.xcassets/AppIcon.appiconset/Contents.json').read_text(encoding='utf-8'))
 for entry in contents['images']:
     if 'filename' in entry:
         size = round(float(entry['size'].split('x')[0]) * float(entry['scale'].rstrip('x')))
