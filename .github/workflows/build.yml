@@ -125,6 +125,22 @@ jobs:
           Write-Host "使用 $($gcc.Source)"
           & $gcc.Source --version | Select-Object -First 1
       - run: python scripts/build_windows.py ${{ matrix.arguments }}
+      - name: Diagnose Windows bundle
+        if: failure()
+        shell: pwsh
+        run: |
+          $bundle = 'build\windows\x64\runner\Release'
+          Write-Host '--- 打包目录 ---'
+          if (Test-Path $bundle) { Get-ChildItem $bundle | Select-Object -ExpandProperty Name } else { Write-Host '目录不存在' }
+          Write-Host '--- 依赖目录 ---'
+          foreach ($path in @('build\windows\x64\libmpv', 'build\windows\x64\ANGLE', 'build\native_assets\windows')) {
+            if (Test-Path $path) { Write-Host "$path 存在，文件数 $((Get-ChildItem $path -Recurse -File | Measure-Object).Count)" } else { Write-Host "$path 不存在" }
+          }
+          Write-Host '--- 手动执行 install 显示真实错误 ---'
+          Push-Location 'build\windows\x64'
+          & cmake -DBUILD_TYPE=Release -P cmake_install.cmake
+          Write-Host "install 退出码=$LASTEXITCODE"
+          Pop-Location
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.edition }}-windows
