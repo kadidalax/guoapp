@@ -118,6 +118,20 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _setForceLogin(bool value) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.store.setForceLogin(value);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   String _permissionsLabel(LocalProfile profile) {
     if (profile.admin) return '管理员 · 全部权限';
     final sources = profile.sources
@@ -165,6 +179,20 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text('各用户的追剧和观看记录独立保存，下载文件由本机共享。'),
+                if (!widget.store.locked && widget.store.profile.admin) ...[
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('启动时需要登录'),
+                    subtitle: Text(
+                      widget.store.forceLogin
+                          ? '每次打开应用先解锁当前受保护用户'
+                          : '保留密码，仅切换用户或手动锁定时验证',
+                    ),
+                    value: widget.store.forceLogin,
+                    onChanged: _busy ? null : _setForceLogin,
+                  ),
+                ],
               ],
               if (_busy)
                 const Padding(

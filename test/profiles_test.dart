@@ -56,13 +56,26 @@ void main() {
       await store.switchProfile('default', pin: 'abcdef12');
       expect(store.favorites.single.id, drama.id);
       expect(prefs.getString('profiles'), isNot(contains('abcdef12')));
+      expect(store.forceLogin, isTrue);
       final restarted = LocalStore(prefs);
+      expect(restarted.forceLogin, isTrue);
       expect(restarted.locked, isTrue);
       expect(restarted.sources, isEmpty);
       await restarted.switchProfile('default', pin: 'abcdef12');
       expect(restarted.canDownload, isTrue);
+      await restarted.setForceLogin(false);
+      expect(restarted.forceLogin, isFalse);
+      final unlocked = LocalStore(prefs);
+      expect(unlocked.forceLogin, isFalse);
+      expect(unlocked.locked, isFalse);
+      expect(unlocked.canDownload, isTrue);
+      unlocked.lock();
+      expect(unlocked.locked, isTrue);
+      await unlocked.switchProfile('default', pin: 'abcdef12');
+      expect(unlocked.locked, isFalse);
       store.dispose();
       restarted.dispose();
+      unlocked.dispose();
     },
   );
 

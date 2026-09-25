@@ -26,6 +26,7 @@ class DownloadRepository extends FixtureRepository {
   int onlineCalls = 0;
   int alternateCalls = 0;
   bool missing = false;
+  DramaDetail? detailOverride;
 
   Episode episode(int number) => Episode({
     'id': '$number',
@@ -51,6 +52,7 @@ class DownloadRepository extends FixtureRepository {
   @override
   Future<DramaDetail> detail(Drama drama) async {
     detailCalls++;
+    if (detailOverride != null) return detailOverride!;
     return DramaDetail(drama, [episode(1), episode(2), episode(3)]);
   }
 
@@ -190,6 +192,17 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('加入下载 · 2 集'), findsOneWidget);
         expect(find.text('已选 VIP 集可能只能下载试看内容。'), findsNothing);
+        await tester.tap(find.text('取消全选'));
+        await tester.pumpAndSettle();
+        expect(find.text('加入下载 · 0 集'), findsOneWidget);
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const ValueKey('enqueue-downloads')),
+              )
+              .onPressed,
+          isNull,
+        );
         await tester.tap(find.text('全选'));
         await tester.pumpAndSettle();
         expect(find.text('已选 VIP 集可能只能下载试看内容。'), findsOneWidget);
@@ -211,6 +224,90 @@ void main() {
       },
     );
   }
+
+  testWidgets('mobile player moves download and follow into tabs', (
+    tester,
+  ) async {
+    size(tester, const Size(390, 844));
+    final repository = DownloadRepository();
+    final player = ScriptedPlayer();
+    final store = await makeStore();
+    final detail = await repository.detail(FixtureRepository.free);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: PlayerScreen(
+          detail: detail,
+          initialIndex: 0,
+          repository: repository,
+          store: store,
+          playerFactory: () => Player(platformPlayer: player),
+          videoBuilder: (controls) => controls,
+        ),
+      ),
+    );
+    await tick(tester);
+    expect(find.byKey(const ValueKey('player-download')), findsNothing);
+    expect(find.byKey(const ValueKey('player-favorite')), findsNothing);
+    expect(find.byKey(const ValueKey('player-volume')), findsNothing);
+    expect(find.text('选集'), findsOneWidget);
+    expect(find.text('简介'), findsOneWidget);
+    expect(find.text('下载'), findsOneWidget);
+    expect(find.text('追剧'), findsNothing);
+    expect(find.text('加入追剧'), findsNothing);
+    expect(find.byKey(const ValueKey('player-follow-status')), findsNothing);
+    await tester.tap(find.text('简介'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('player-follow-status')), findsOneWidget);
+    expect(find.text('加入追剧'), findsOneWidget);
+    await tester.tap(find.text('下载'));
+    await tester.pumpAndSettle();
+    expect(find.text('下载选集'), findsOneWidget);
+    expect(find.byKey(const ValueKey('download-episode-1')), findsOneWidget);
+    expect(find.text('清空'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('download-quality')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('720P').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('enqueue-downloads')));
+    await tester.pumpAndSettle();
+    expect(repository.selected, [1, 2]);
+    expect(repository.quality, 720);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tick(tester);
+    expect(player.disposed, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('DSD VIP episodes open playback without a confirmation dialog', (
+    tester,
+  ) async {
+    if (!SourceSite.isAvailable(SourceSite.dsd.id)) return;
+    size(tester, const Size(390, 844));
+    final repository = DownloadRepository();
+    final store = await makeStore();
+    final drama = const Drama(
+      id: 'dsd:100',
+      source: 'dsd',
+      title: '帝果合成剧',
+      episodes: 1,
+    );
+    repository.detailOverride = DramaDetail(drama, [
+      Episode({'id': '1', 'currentEpisode': 1, 'vip': true}, 1),
+    ]);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: DetailScreen(drama: drama, repository: repository, store: store),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('episode-1')));
+    await tester.pump();
+    expect(find.text('这是一集 VIP 内容'), findsNothing);
+    expect(find.text('正在准备播放'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('queue controls, filtering and deletion work on a narrow phone', (
     tester,

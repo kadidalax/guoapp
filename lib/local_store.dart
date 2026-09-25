@@ -10,6 +10,7 @@ import 'playback_preferences.dart';
 import 'download_preferences.dart';
 import 'catalog_sort.dart';
 import 'follow_state.dart';
+import 'hongguo_series.dart';
 import 'lan_sync_models.dart';
 
 part 'local_store_sync.dart';
@@ -29,6 +30,7 @@ class LocalStore extends ChangeNotifier {
   final Map<String, WatchEntry> _history = {};
   final Map<String, Drama> _favorites = {};
   final Map<String, FollowState> _followStates = {};
+  final Map<String, Drama> _seriesCandidates = {};
   Future<void> _writes = Future<void>.value();
   List<LocalProfile> _profiles = [];
   String _current = 'default';
@@ -58,7 +60,7 @@ class LocalStore extends ChangeNotifier {
         _current = _profiles.firstWhere((profile) => profile.admin).id;
       }
       _configurationError = null;
-      _locked = profile.protected;
+      _locked = forceLogin && profile.protected;
       _loadLibrary();
     } catch (_) {
       _block('本地用户配置损坏，已锁定访问。原始记录已保留，请重新读取或从备份恢复。');
@@ -93,6 +95,7 @@ class LocalStore extends ChangeNotifier {
     _history.clear();
     _favorites.clear();
     _followStates.clear();
+    _seriesCandidates.clear();
     _epoch++;
   }
 
@@ -110,6 +113,12 @@ class LocalStore extends ChangeNotifier {
       _profiles.firstWhere((profile) => profile.id == _current);
   bool get locked => _locked || _configurationError != null;
   int get profileEpoch => _epoch;
+  bool get forceLogin {
+    if (_configurationError != null) return true;
+    final admin = _profiles.firstWhere((profile) => profile.admin);
+    return _bool('forceLogin') ?? admin.protected;
+  }
+
   bool get canDownload => !locked && (profile.admin || profile.download);
   bool allowsSource(String source) =>
       !locked && SourceSite.isAvailable(source) && profile.allows(source);
@@ -121,6 +130,7 @@ class LocalStore extends ChangeNotifier {
     _history.clear();
     _favorites.clear();
     _followStates.clear();
+    _seriesCandidates.clear();
     if (_configurationError != null) return;
     for (final row in readJsonList(_string(_key('history')))) {
       try {
@@ -152,6 +162,14 @@ class LocalStore extends ChangeNotifier {
         );
       }
     }
+    for (final row in readJsonList(_string(_key('seriesCandidates')))) {
+      try {
+        final drama = Drama.fromJson(row);
+        if (drama.source == SourceSite.hongguo.id) {
+          _seriesCandidates[drama.id] = drama;
+        }
+      } catch (_) {}
+    }
   }
 
   List<WatchEntry> get history =>
@@ -178,6 +196,44 @@ class LocalStore extends ChangeNotifier {
       _favorites[id] != null && allowsSource(_favorites[id]!.source);
   FollowState? following(String id) =>
       isFavorite(id) ? _followStates[id] : null;
+  List<Drama> seriesDramasFor(Drama anchor) {
+    if (!allowsSource(SourceSite.hongguo.id) ||
+        anchor.source != SourceSite.hongguo.id) {
+      return const [];
+    }
+    final items = <String, Drama>{};
+    for (final drama in _seriesCandidates.values) {
+      if (allowsSource(drama.source)) items[drama.id] = drama;
+    }
+    for (final drama in _favorites.values) {
+      if (allowsSource(drama.source)) items[drama.id] = drama;
+    }
+    for (final entry in _history.values) {
+      if (allowsSource(entry.drama.source)) items[entry.drama.id] = entry.drama;
+    }
+    final notices = <SeriesSeasonNotice>[
+      ...?_followStates[anchor.id]?.seriesSeasons.values,
+      for (final state in _followStates.values)
+        if (state.seriesSeasons.containsKey(anchor.id))
+          state.seriesSeasons[anchor.id]!,
+    ];
+    for (final notice in notices) {
+      items.putIfAbsent(
+        notice.id,
+        () => Drama(
+          id: notice.id,
+          source: SourceSite.hongguo.id,
+          sourceId: notice.id.substring(SourceSite.hongguo.id.length + 1),
+          title: notice.title,
+        ),
+      );
+    }
+    final current = items.remove(anchor.id) ?? anchor;
+    final rest = items.values.toList()
+      ..sort((a, b) => naturalTitleCompare(a.title, b.title));
+    return [current, ...rest];
+  }
+
   bool get hideVip =>
       _configurationError == null ? _bool(_key('hideVip')) ?? true : true;
   String get displayMode {
@@ -347,6 +403,8 @@ class LocalStore extends ChangeNotifier {
       _setting('exportPosters', value, admin: true);
   Future<void> setAutoExport(bool value) =>
       _setting('autoExport', value, admin: true);
+  Future<void> setForceLogin(bool value) =>
+      _setting('forceLogin', value, admin: true);
   Future<void> setHideVip(bool value) => _setting(_key('hideVip'), value);
   Future<void> setSource(String value) {
     if (!allowsSource(value)) return Future.error(StateError('当前用户没有此站源权限'));
@@ -432,6 +490,20 @@ class LocalStore extends ChangeNotifier {
       if (!isFavorite(id) || epoch != _epoch) return;
       final states = Map.of(_followStates)
         ..[id] = _followStates[id]!.markRead();
+      await _commit({_key('followStates'): _encodeFollowStates(states)});
+      _loadLibrary();
+      _notify();
+    });
+  }
+
+  Future<void> markSeriesSeasonRead(String id, String seasonId) {
+    final epoch = _epoch;
+    return _queue(() async {
+      if (!isFavorite(id) || epoch != _epoch) return;
+      final current = _followStates[id]!;
+      final updated = current.markSeriesSeasonRead(seasonId);
+      if (identical(current, updated)) return;
+      final states = Map.of(_followStates)..[id] = updated;
       await _commit({_key('followStates'): _encodeFollowStates(states)});
       _loadLibrary();
       _notify();
@@ -543,9 +615,16 @@ class LocalStore extends ChangeNotifier {
     });
   }
 
-  Future<void> refreshDrama(Drama drama) => refreshDramas([drama]);
+  Future<void> refreshDrama(Drama drama) =>
+      _refreshDramas([drama], cacheSeriesCandidates: false);
 
-  Future<void> refreshDramas(Iterable<Drama> dramas) {
+  Future<void> refreshDramas(Iterable<Drama> dramas) =>
+      _refreshDramas(dramas, cacheSeriesCandidates: true);
+
+  Future<void> _refreshDramas(
+    Iterable<Drama> dramas, {
+    required bool cacheSeriesCandidates,
+  }) {
     final epoch = _epoch;
     final updates = dramas.toList();
     return _queue(() async {
@@ -554,8 +633,13 @@ class LocalStore extends ChangeNotifier {
       final favorites = Map.of(_favorites);
       final history = Map.of(_history);
       final states = Map.of(_followStates);
+      final seriesCandidates = Map.of(_seriesCandidates);
       for (final drama in updates) {
         if (!allowsSource(drama.source)) continue;
+        if (cacheSeriesCandidates && drama.source == SourceSite.hongguo.id) {
+          seriesCandidates[drama.id] = (seriesCandidates[drama.id] ?? drama)
+              .merge(drama);
+        }
         final favorite = favorites[drama.id];
         if (favorite != null) {
           favorites[drama.id] = favorite.merge(drama);
@@ -572,6 +656,38 @@ class LocalStore extends ChangeNotifier {
           );
         }
       }
+      final candidates = <String, Drama>{
+        for (final entry in history.values) entry.drama.id: entry.drama,
+        ...favorites,
+        for (final drama in updates)
+          if (allowsSource(drama.source)) drama.id: drama,
+      };
+      for (final state in states.values) {
+        for (final notice in state.seriesSeasons.values) {
+          candidates.putIfAbsent(
+            notice.id,
+            () => Drama(
+              id: notice.id,
+              source: SourceSite.hongguo.id,
+              sourceId: notice.id.substring(SourceSite.hongguo.id.length + 1),
+              title: notice.title,
+            ),
+          );
+        }
+      }
+      final favoriteIds = favorites.keys.toSet();
+      for (final favorite in favorites.values) {
+        if (favorite.source != SourceSite.hongguo.id ||
+            states[favorite.id] == null) {
+          continue;
+        }
+        states[favorite.id] = observeHongguoSeriesSeasons(
+          anchor: favorite,
+          state: states[favorite.id]!,
+          candidates: candidates.values,
+          favoriteIds: favoriteIds,
+        );
+      }
       final favoriteJson = jsonEncode(
         favorites.values.map((entry) => entry.toJson()).toList(),
       );
@@ -579,6 +695,15 @@ class LocalStore extends ChangeNotifier {
         history.values.map((entry) => entry.toJson()).toList(),
       );
       final statesJson = _encodeFollowStates(states);
+      final seriesCandidateJson = cacheSeriesCandidates
+          ? jsonEncode(
+              (seriesCandidates.values.toList()
+                    ..sort((a, b) => a.id.compareTo(b.id)))
+                  .take(2000)
+                  .map((entry) => entry.toJson())
+                  .toList(),
+            )
+          : null;
       if (favoriteJson !=
           jsonEncode(
             _favorites.values.map((entry) => entry.toJson()).toList(),
@@ -591,6 +716,17 @@ class LocalStore extends ChangeNotifier {
       }
       if (statesJson != _encodeFollowStates(_followStates)) {
         changes[_key('followStates')] = statesJson;
+      }
+      if (seriesCandidateJson != null &&
+          seriesCandidateJson !=
+              jsonEncode(
+                (_seriesCandidates.values.toList()
+                      ..sort((a, b) => a.id.compareTo(b.id)))
+                    .take(2000)
+                    .map((entry) => entry.toJson())
+                    .toList(),
+              )) {
+        changes[_key('seriesCandidates')] = seriesCandidateJson;
       }
       if (changes.isEmpty) return;
       await _commit(changes);
@@ -651,9 +787,7 @@ class LocalStore extends ChangeNotifier {
     if (cleanName.isEmpty || cleanName.length > 40) {
       throw StateError('用户名需要 1 至 40 个字符');
     }
-    if (sources.any(
-      (source) => !SourceSite.knownValues.any((site) => site.id == source),
-    )) {
+    if (sources.any((source) => !SourceSite.isKnown(source))) {
       throw StateError('站源无效');
     }
     if (targetId != 'default' &&
@@ -733,6 +867,7 @@ class LocalStore extends ChangeNotifier {
       'themeMode': themeMode,
       'autoExport': autoExport,
       'exportPosters': exportPosters,
+      'forceLogin': forceLogin,
       'libraries': {
         for (final profile in _profiles)
           profile.id: {
@@ -741,6 +876,9 @@ class LocalStore extends ChangeNotifier {
             'favorites': readJsonList(_string(_key('favorites', profile.id))),
             'followStates': jsonDecode(
               _string(_key('followStates', profile.id)) ?? '{}',
+            ),
+            'seriesCandidates': readJsonList(
+              _string(_key('seriesCandidates', profile.id)),
             ),
             'mediaHistory': jsonDecode(
               _string(_key('mediaHistory', profile.id)) ?? '{}',
@@ -782,6 +920,9 @@ class LocalStore extends ChangeNotifier {
         !{'light', 'dark', 'system'}.contains(data['themeMode'])) {
       throw const FormatException('备份主题设置无效');
     }
+    if (data.containsKey('forceLogin') && data['forceLogin'] is! bool) {
+      throw const FormatException('备份登录设置无效');
+    }
     final libraries = data['libraries'] as Map;
     for (final profile in profiles) {
       final library = libraries[profile.id] as Map;
@@ -800,6 +941,7 @@ class LocalStore extends ChangeNotifier {
         Drama.fromJson(Map<String, dynamic>.from(row as Map));
       }
       final states = library['followStates'] as Map? ?? {};
+      final seriesCandidates = library['seriesCandidates'] as List? ?? [];
       final favoriteIds = favorites.map((row) => (row as Map)['id']).toSet();
       _readBackupFollowSync(library);
       if (states.length > 20000 ||
@@ -808,6 +950,12 @@ class LocalStore extends ChangeNotifier {
       }
       for (final row in states.values) {
         FollowState.fromJson(Map<String, dynamic>.from(row as Map));
+      }
+      if (seriesCandidates.length > 2000) {
+        throw const FormatException('备份系列候选过多');
+      }
+      for (final row in seriesCandidates) {
+        Drama.fromJson(Map<String, dynamic>.from(row as Map));
       }
       if (library['hideVip'] is! bool || library['source'] is! String) {
         throw const FormatException('备份设置无效');
@@ -846,6 +994,9 @@ class LocalStore extends ChangeNotifier {
       'themeMode': data['themeMode'] as String? ?? themeMode,
       'autoExport': data['autoExport'] == true,
       'exportPosters': data['exportPosters'] == true,
+      'forceLogin': data['forceLogin'] is bool
+          ? data['forceLogin'] as bool
+          : profiles.firstWhere((profile) => profile.admin).protected,
     };
     final libraries = data['libraries'] as Map;
     for (final profile in profiles) {
@@ -860,6 +1011,9 @@ class LocalStore extends ChangeNotifier {
         _key('favorites', profile.id): jsonEncode(library['favorites']),
         _key('followStates', profile.id): jsonEncode(
           library['followStates'] ?? {},
+        ),
+        _key('seriesCandidates', profile.id): jsonEncode(
+          library['seriesCandidates'] ?? [],
         ),
         _key('mediaHistory', profile.id): jsonEncode(
           library['mediaHistory'] ?? {},
@@ -882,7 +1036,7 @@ class LocalStore extends ChangeNotifier {
     _profiles = profiles;
     _current = profiles.firstWhere((profile) => profile.admin).id;
     _configurationError = null;
-    _locked = profile.protected;
+    _locked = forceLogin && profile.protected;
     _loadLibrary();
     _epoch++;
     _notify();
