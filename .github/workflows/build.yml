@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: '填写 tag（例如 v0.2.17）时构建完成后创建 GitHub Release；留空只上传 Actions 产物'
+        description: '可选：指定 Release tag（例如 v0.2.50-unverified）；留空按 pubspec 版本号 v<版本号> 发布'
         required: false
         type: string
 
@@ -183,42 +183,71 @@ jobs:
 
   release:
     needs: [android, windows, ios]
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.release_tag != '' }}
+    if: ${{ !cancelled() && needs.android.result == 'success' && needs.windows.result == 'success' && needs.ios.result == 'success' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: release-assets
       - name: Collect release assets
         run: |
           set -euo pipefail
-          mkdir -p assets
+          mkdir -p release-files
           find release-assets -type f -print0 | while IFS= read -r -d '' file; do
             artifact="$(basename "$(dirname "$file")")"
             name="$(basename "$file")"
             if [ "$name" = 'SHA256SUMS.txt' ]; then
               name="$artifact-$name"
             fi
-            cp "$file" "assets/$name"
+            cp "$file" "release-files/$name"
           done
-          ls -l assets
-      - name: Create GitHub Release
+          ls -l release-files
+      - name: Resolve release tag
+        id: tag
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
-          files=(assets/*)
+          version="$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n 1 | tr -d '[:space:]')"
+          version="${version%%+*}"
+          tag="${RELEASE_TAG:-v$version}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            tag="v$version-build-${GITHUB_SHA:0:7}"
+          fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          VERSION: ${{ steps.tag.outputs.version }}
+          EXISTS: ${{ steps.tag.outputs.exists }}
+        run: |
+          set -euo pipefail
+          files=(release-files/*)
           if [ ! -e "${files[0]}" ]; then
             echo '没有可发布的产物，跳过 Release'
             exit 1
           fi
           printf '%s\n' "${files[@]}"
-          gh release create "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "$RELEASE_TAG" \
-            --notes "真果鉴（全站源）与红果鉴的 Android APK、Windows 完整 ZIP、iOS 未签名包，由 Build app packages 工作流生成，未经过设备验证。" \
-            "${files[@]}"
+          notes="真果鉴（全站源）与红果鉴的 Android APK、Windows 完整 ZIP、iOS 未签名包，源码版本 ${VERSION}，由 Build app packages 运行 ${GITHUB_RUN_ID} 生成，未经过设备验证。"
+          if [ "$EXISTS" = 'true' ]; then
+            gh release upload "$TAG" --clobber --repo "$GITHUB_REPOSITORY" "${files[@]}"
+          else
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "$TAG" \
+              --notes "$notes" \
+              "${files[@]}"
+          fi

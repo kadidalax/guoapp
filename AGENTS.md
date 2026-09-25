@@ -30,7 +30,7 @@
 
 ## 构建与发布
 
-`.github/workflows/build.yml` 在推送 `main` / `master` 或手动运行时构建红果鉴 / 真果鉴的 Android、Windows、iOS 产物，不跑测试；`v*` 标签推送不触发构建。Android 签名走仓库 Secrets，未配置时产出预览签名 APK；手动运行填写 tag 时全部构建结束后自动创建 Release。首次 Actions 运行结果确认前，不得声称任一平台可构建或可安装。
+`.github/workflows/build.yml` 在推送 `main` / `master` 或手动运行时构建红果鉴 / 真果鉴的 Android、Windows、iOS 产物，不跑测试；`v*` 标签推送不触发构建。Android 签名走仓库 Secrets，未配置时产出预览签名 APK；三个平台全部构建成功后自动按 `v<pubspec 版本号>` 创建 Release 并挂上产物，手动运行可用 `release_tag` 指定 tag，同名 Release 已存在时改用 `v<版本号>-build-<短 SHA>`，不覆盖或移动已有 tag。首次 Actions 运行结果确认前，不得声称任一平台可构建或可安装。
 
 ## 代码与资料
 

@@ -4,7 +4,7 @@ Flutter 多端独立短剧应用，原名“短剧库 APP”。站源请求、�
 
 按用户 2026-09-21 的要求，继续暂停整体验证。启动、榜单、画质增强、站源改名、画中画、连续播放控制栏、红果系列剧提醒、播放器 Tab 化、首页 / 播放页优化、多站源站源修复和本轮启动登录开关均保留未验证快照状态；本轮只执行源码级定向检查，未完成真实设备视觉验收、Release APK、IPA 或真实站源播放验收。历史版本的检查记录不能作为本轮新增功能的验收结论。
 
-源码发布在 GitHub 仓库 `https://github.com/kadidalax/guoapp`，本项目本身即作为该发布仓库维护，不再另建同级镜像。`.github/workflows/build.yml` 在推送 `main` / `master` 或手动运行 **Build app packages** 时构建红果鉴 / 真果鉴的 Android、Windows、iOS 产物，不跑测试；`v*` 标签推送不触发构建，手动运行填写 tag 后在全部构建结束时自动创建 Release。0.2.17 至 0.2.50 的更新由 `guoapp` 目录整理合入本仓库，合入时保留本仓库的构建发布配置、收尾脚本与约定文档，对应源码快照 `v0.2.50-unverified`。
+源码发布在 GitHub 仓库 `https://github.com/kadidalax/guoapp`，本项目本身即作为该发布仓库维护，不再另建同级镜像。`.github/workflows/build.yml` 在推送 `main` / `master` 或手动运行 **Build app packages** 时构建红果鉴 / 真果鉴的 Android、Windows、iOS 产物，不跑测试；`v*` 标签推送不触发构建。三个平台全部构建成功后自动创建 GitHub Release，tag 取 `v<pubspec 版本号>`（本轮为 `v0.2.50`），同名 Release 已存在时改用 `v<版本号>-build-<短 SHA>`，手动运行可用 `release_tag` 指定 tag。0.2.17 至 0.2.50 的更新由 `guoapp` 目录整理合入本仓库，合入时保留本仓库的构建发布配置、收尾脚本与约定文档，对应源码快照 `v0.2.50-unverified`。
 
 | 编译方式 | 应用名称 | 可用站源 |
 | --- | --- | --- |
@@ -640,7 +640,7 @@ SR-1、SR-2 与 SR-4 已接入源码，小型动漫 CNN 也包含在本轮；SR-
 
 本项目本身即是 GitHub 仓库：`https://github.com/kadidalax/guoapp`。仓库根目录只保留源码、平台工程、`.github`、锁文件和必要资源；SDK、依赖目录、SO / DLL、APK / EXE、签名文件、构建缓存和个人配置都不上传。
 
-推送 `main` / `master`，或手动运行 **Build app packages**，只构建不跑测试：
+推送 `main` / `master`，或手动运行 **Build app packages**，只构建不跑测试；三个平台全部成功后自动发布 GitHub Release：
 
 | 红果版 Artifact | 全站源版 Artifact | 内容 |
 | --- | --- | --- |
@@ -648,9 +648,9 @@ SR-1、SR-2 与 SR-4 已接入源码，小型动漫 CNN 也包含在本轮；SR-
 | `hongguojian-windows` | `zhenguojian-windows` | 完整 ZIP 和 SHA256 |
 | `hongguojian-ios-unsigned` | `zhenguojian-ios-unsigned` | 未签名 `.app` ZIP 和 SHA256，不能直接当已签名 IPA 安装 |
 
-Actions 分别传入默认参数与 `--all-sources` 构建红果鉴 / 真果鉴两版，真果鉴包含全部站源。产物保留 14 天；`v*` 标签推送不触发构建。手动运行 **Build app packages** 时可在 `release_tag` 填入 tag（例如 `v0.2.17`），全部构建结束后自动创建同名 GitHub Release 并挂上产物，便于直接下载；Artifacts 需要登录 GitHub 才能下载，Release 不需要。
+Actions 分别传入默认参数与 `--all-sources` 构建红果鉴 / 真果鉴两版，真果鉴包含全部站源。Artifacts 保留 14 天，需要登录 GitHub 才能下载；`v*` 标签推送不触发构建。三个平台全部构建成功后，release 任务自动 checkout 读取 `pubspec.yaml`，按 `v<pubspec 版本号>`（去掉 `+构建号`，例如 `v0.2.50`）创建 Release 并挂上六份产物，不需要登录即可下载；同名 Release 已存在时改用 `v<版本号>-build-<短 SHA>`，不覆盖或移动已有 tag。手动运行 **Build app packages** 可在 `release_tag` 指定 tag，留空同样按版本号发布；任一平台失败则不发布。
 
-已发布 Release `v0.2.16-unverified-utf8-io`，内容为提交 `47242fa` 的构建产物：两版 Android 各三个架构 APK（约 29.4 / 37.5 / 31 MB）、两版 Windows 完整 ZIP（各 56.8 MB）、两版 iOS 未签名 ZIP（各 28.5 MB），另附各平台 `SHA256SUMS.txt`。自动创建 Release 的步骤修过两处（同名 `SHA256SUMS.txt` 冲突、未 checkout 时缺少 `--repo` 仓库上下文），最后一次修改（提交 `d94ff32`）尚未在 Actions 中运行验证；上面的 Release 是用已验证运行 `35734155185` 的产物手工发布的。
+已发布 Release `v0.2.16-unverified-utf8-io`，内容为提交 `47242fa` 的构建产物：两版 Android 各三个架构 APK（约 29.4 / 37.5 / 31 MB）、两版 Windows 完整 ZIP（各 56.8 MB）、两版 iOS 未签名 ZIP（各 28.5 MB），另附各平台 `SHA256SUMS.txt`。自动创建 Release 的步骤修过两处（同名 `SHA256SUMS.txt` 冲突、未 checkout 时缺少 `--repo` 仓库上下文），最后一次修改（提交 `d94ff32`）尚未在 Actions 中运行验证；上面的 Release 是用已验证运行 `35734155185` 的产物手工发布的；本轮已把 release 任务整体改写为三平台构建成功后自动按版本号发布，取代旧的按需创建步骤。
 
 不使用 `sdkmanager` 安装 NDK，也不再使用第三方 `setup-mingw` 动作：Android 直接用 runner 镜像自带的 NDK `28.2.13676358`（并写入 `ANDROID_NDK_HOME`），Windows 使用镜像自带的 MinGW-w64 gcc，只做可用性检查并按需补 PATH。
 
