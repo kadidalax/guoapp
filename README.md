@@ -650,7 +650,9 @@ SR-1、SR-2 与 SR-4 已接入源码，小型动漫 CNN 也包含在本轮；SR-
 
 Actions 分别传入默认参数与 `--all-sources` 构建红果鉴 / 真果鉴两版，真果鉴包含全部站源。Artifacts 保留 14 天，需要登录 GitHub 才能下载；`v*` 标签推送不触发构建。三个平台全部构建成功后，release 任务自动 checkout 读取 `pubspec.yaml`，按 `v<pubspec 版本号>`（去掉 `+构建号`，例如 `v0.2.50`）创建 Release 并挂上六份产物，不需要登录即可下载；同名 Release 已存在时改用 `v<版本号>-build-<短 SHA>`，不覆盖或移动已有 tag。手动运行 **Build app packages** 可在 `release_tag` 指定 tag，留空同样按版本号发布；任一平台失败则不发布。
 
-已发布 Release `v0.2.16-unverified-utf8-io`，内容为提交 `47242fa` 的构建产物：两版 Android 各三个架构 APK（约 29.4 / 37.5 / 31 MB）、两版 Windows 完整 ZIP（各 56.8 MB）、两版 iOS 未签名 ZIP（各 28.5 MB），另附各平台 `SHA256SUMS.txt`。自动创建 Release 的步骤修过两处（同名 `SHA256SUMS.txt` 冲突、未 checkout 时缺少 `--repo` 仓库上下文），最后一次修改（提交 `d94ff32`）尚未在 Actions 中运行验证；上面的 Release 是用已验证运行 `35734155185` 的产物手工发布的；本轮已把 release 任务整体改写为三平台构建成功后自动按版本号发布，取代旧的按需创建步骤。
+历史 Release `v0.2.16-unverified-utf8-io`（2026-09-22）内容为提交 `47242fa` 的构建产物：两版 Android 各三个架构 APK（约 29.4 / 37.5 / 31 MB）、两版 Windows 完整 ZIP（各 56.8 MB）、两版 iOS 未签名 ZIP（各 28.5 MB），另附各平台 `SHA256SUMS.txt`；当时自动创建 Release 的步骤修过两处（同名 `SHA256SUMS.txt` 冲突、未 checkout 时缺少 `--repo` 仓库上下文），该 Release 是用已验证运行 `35734155185` 的产物手工发布的。
+
+已发布 Release `v0.2.50`（2026-09-25）：推送 `7b2d227` 触发的运行 `36105996834` 六个构建任务全部成功，release 任务自动创建该 Release 并指向该提交，共 16 份资产 —— 两版各三架构 APK（arm64-v8a 29.73 MB、armeabi-v7a 37.86 MB、x86_64 31.31 MB）、两版 Windows 完整 ZIP 各 90.29 MB、两版 iOS 未签名 ZIP 各 28.83 MB，另附各平台 `SHA256SUMS.txt`；同日更早的推送 `436d499` 运行 `36104706529` 也是六个任务全部成功，当时 release 逻辑尚未接入，产物只在 Artifacts。这些结论只说明构建与自动发布成功，未在设备上安装、播放或验证真实站源。
 
 不使用 `sdkmanager` 安装 NDK，也不再使用第三方 `setup-mingw` 动作：Android 直接用 runner 镜像自带的 NDK `28.2.13676358`（并写入 `ANDROID_NDK_HOME`），Windows 使用镜像自带的 MinGW-w64 gcc，只做可用性检查并按需补 PATH。
 
